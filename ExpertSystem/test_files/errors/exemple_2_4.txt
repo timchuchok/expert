@@ -1,0 +1,8 @@
+D + E => A
+A => D + E
+D | E => B
+B => C
+
+= #A is false
+
+?A

@@ -1,0 +1,7 @@
+D + # => A
+D | E => B
+B => C
+
+= #A is false
+
+?A
