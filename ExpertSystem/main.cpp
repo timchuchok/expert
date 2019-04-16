@@ -4,6 +4,8 @@
 #include <string>
 #include <stack>
 #include <fstream>
+#include <algorithm>
+#include <regex>
 
 #define NORMAL  "\x1B[0m"
 #define FALSE  "\x1B[31mfalse"
@@ -57,6 +59,15 @@ struct Helper {
 
     static bool compare(char lhs, char rhs) {
         return getPriority(lhs) > getPriority(rhs);
+    }
+
+    static bool isPairParenthesis(const std::string &expr) {
+        auto count = 0;
+        for (const auto c: expr) {
+            if (c == '(') ++count;
+            if (c == ')') --count;
+        }
+        return count == 0;
     }
 };
 
@@ -169,8 +180,18 @@ int main(int argc, char **argv) {
 
     auto *system = new ExpertSystem();
 
+    if (!system) {
+        printf("Cannot create object(\n");
+        exit(1);
+    }
+
     std::ifstream file;
     std::string line;
+    std::regex factRegex("=[A-Z]{0,}");
+    std::regex queryRegex("\\?[A-Z]{1,}");
+    std::regex ruleRegex("^(([!]?[(]?[!]?[A-Z]{1,1}[)]?[+|^]?)|([!]?[(]?[!]?[A-Z]{1,1}[+|^]{1,1}[!]?[A-Z]{1,1}[)]?))+");
+    std::regex ruleRegexWrongEnd("[+^|]$");
+    std::regex ruleRegexAdditional("^[A-Z]{2,}");
     if (argc != 2) {
         printf("Please, provide file\n");
         exit(1);
@@ -188,14 +209,20 @@ int main(int argc, char **argv) {
         if (line.empty() || line[0] == '#') continue;
         std::string rule = line.substr(0, line.find('#'));
 
-        printf("Rule: %s\n", rule.c_str());
-
         if (line[0] == '?') {
+            if (!std::regex_match(rule, queryRegex)) {
+                printf("Invalid query syntax!\n");
+                exit(1);
+            }
             system->queries = rule.substr(1, rule.size());
             queryPresented = true;
         }
 
         else if (rule[0] == '=') {
+            if (!std::regex_match(rule, factRegex)) {
+                printf("Invalid fact syntax!\n");
+                exit(1);
+            }
             factsPresented= true;
             auto i = 1;
             while (rule[i] && Helper::isAlpha(rule[i])) {
@@ -207,11 +234,18 @@ int main(int argc, char **argv) {
         else if (!line.empty()) {
             std::string left = rule.substr(0, rule.find("=>"));
             std::string right = rule.substr(rule.find("=>") + 2);
+            if (!std::regex_match(left, ruleRegex) || !std::regex_match(right, ruleRegex)
+                || std::regex_search(left, ruleRegexAdditional) || std::regex_search(right, ruleRegexAdditional)
+                || std::regex_search(left, ruleRegexWrongEnd) || std::regex_search(right, ruleRegexWrongEnd)
+                || !Helper::isPairParenthesis(left) || !Helper::isPairParenthesis(right)) {
+                printf("Invalid rule syntax\n");
+                exit(1);
+            }
             system->rules.emplace_back(Rule(left, right));
         }
     }
 
-    if (!factsPresented || !queryPresented) {
+    if (!factsPresented || !queryPresented || system->rules.empty()) {
         printf("Error in file\n");
         exit(1);
     }
